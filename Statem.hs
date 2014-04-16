@@ -17,6 +17,8 @@ module Statem (show,
 import Control.Monad
 import Data.List
 
+newtype Tst a = Tst (a->Bool)
+
 newtype Transition i t a = Transition (State i, t, State i)
 
 type DFA i t a = Statem Maybe i t a
@@ -26,15 +28,18 @@ type NFA i t a = Statem [] i t a
 class Predicate b a where
   check :: b -> a -> Bool
 
-instance Predicate (a->Bool) a where
-  check = id
+instance Predicate (Tst a) a where
+  check (Tst tst) = tst
 
 instance (Ord a) => Predicate a a where
   check = (==)
 
-instance Show i => Show (Transition i t a) where
-  show (Transition (s, _, s')) =
-    (show s) ++ " -?-> " ++ (show s')
+instance Show (Tst a) where
+  show _ = "?"
+
+instance (Show i, Show t) => Show (Transition i t a) where
+  show (Transition (s, tst, s')) =
+    (show s) ++ " -" ++ show tst ++ "-> " ++ (show s')
 
 data State i = State i deriving (Show,Eq)
 
@@ -44,7 +49,7 @@ info (State i) = i
 data Statem m i t a = Statem { transitions :: [Transition i t a],
                                current :: m (State i)}
 
-instance (Show i, Show (m (State i))) => Show (Statem m i t a) where
+instance (Show i, Show t, Show (m (State i))) => Show (Statem m i t a) where
   show st = "Statem { " ++ (show (transitions st)) ++ ", " ++ show (current st) ++ " }"
 
 state i = State i

@@ -5,17 +5,16 @@ import Control.Monad
 
 --matchString :: String -> m Int Char
 matchString s =
-  let edges = map (==) s
-      states = map state [1..]
-  in chainFrom (state 0) (zip edges states)
+  let states = map state [1..]
+  in chainFrom (state 0) (zip s states)
 
-aab_star :: DFA Int Char
-aab_star = connect (state 2) (=='b') (state 0) $ matchString "aa"
+aab_star :: DFA Int Char Char
+aab_star = connect (state 2) 'b' (state 0) $ matchString "aa"
 
 --aab_star = aab_star'
 
-aab_or_ab_star :: NFA Int Char
-aab_or_ab_star = connect (state 1) (=='a') (state 0) $ connect (state 2) (=='b') (state 0) $ matchString "aa"
+aab_or_ab_star :: NFA Int Char Char
+aab_or_ab_star = connect (state 1) 'a' (state 0) $ connect (state 2) 'b' (state 0) $ matchString "aa"
 
 main = do
   putStrLn "DFA:"

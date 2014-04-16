@@ -1,7 +1,6 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts, FlexibleInstances, MultiParamTypeClasses #-}
 
-module Statem (Edge,
-               show,
+module Statem (show,
                State,
                Statem (current,transitions),
                cur_transitions,
@@ -15,21 +14,25 @@ module Statem (Edge,
                apply,
                applyAll) where
 
-import Test.QuickCheck
 import Control.Monad
 import Data.List
 
------------ STATEM
+newtype Transition i t a = Transition (State i, t, State i)
 
-type Edge a = a->Bool
+type DFA i t a = Statem Maybe i t a
+type NFA i t a = Statem [] i t a
 
-newtype Transition i a = Transition (State i, Edge a, State i)
+-- A predicate implements check, which takes a value and returns a function from the alphabet to Bool
+class Predicate b a where
+  check :: b -> a -> Bool
 
-type DFA i a = Statem Maybe i a
-type NFA i a = Statem [] i a
+instance Predicate (a->Bool) a where
+  check = id
 
+instance (Ord a) => Predicate a a where
+  check = (==)
 
-instance Show i => Show (Transition i a) where
+instance Show i => Show (Transition i t a) where
   show (Transition (s, _, s')) =
     (show s) ++ " -?-> " ++ (show s')
 
@@ -38,18 +41,18 @@ data State i = State i deriving (Show,Eq)
 info :: State i -> i
 info (State i) = i
 
-data Statem m i a = Statem { transitions :: [Transition i a],
-                             current :: m (State i)}
+data Statem m i t a = Statem { transitions :: [Transition i t a],
+                               current :: m (State i)}
 
-instance (Show i, Show (m (State i))) => Show (Statem m i a) where
+instance (Show i, Show (m (State i))) => Show (Statem m i t a) where
   show st = "Statem { " ++ (show (transitions st)) ++ ", " ++ show (current st) ++ " }"
 
 state i = State i
 
-empty :: MonadPlus m => m (State i) -> Statem m i a
+empty :: MonadPlus m => m (State i) -> Statem m i t a
 empty start = Statem { transitions = [], current = start }
 
-chainFrom :: MonadPlus m => State i -> [(Edge a, State i)] -> Statem m i a 
+chainFrom :: MonadPlus m => State i -> [(t, State i)] -> Statem m i t a
 chainFrom start tss = 
   let
     (ret, _) =
@@ -59,24 +62,24 @@ chainFrom start tss =
       tss
   in ret
 
-connect :: State i -> Edge a -> State i -> Statem m i a  -> Statem m i a
+connect :: State i -> t -> State i -> Statem m i t a  -> Statem m i t a
 connect s t s' sm = sm { transitions = (Transition (s, t, s')) : (transitions sm) }
 
-cur_transitions :: (MonadPlus m, Eq i) => Statem m i a -> m (Transition i a)
+cur_transitions :: (MonadPlus m, Eq i) => Statem m i t a -> m (Transition i t a)
 cur_transitions (Statem {current = cur, transitions = ts}) = do
   c <- cur
   msum $ map return $ filter (\(Transition (s,_,_))-> s==c) ts
 
-new_state :: (MonadPlus m, Eq i) => a -> Statem m i a -> m (State i)
+new_state :: (Predicate t a, MonadPlus m, Eq i) => a -> Statem m i t a -> m (State i)
 new_state x st = do
   (Transition (_,t,s)) <- cur_transitions st
-  guard (t x)
+  guard (check t $ x)
   return s
 
-applyAll :: (MonadPlus m, Eq i) => [a] -> Statem m i a -> Statem m i a
+applyAll :: (Predicate t a, MonadPlus m, Eq i) => [a] -> Statem m i t a -> Statem m i t a
 applyAll xs st = foldl' (\st x -> apply x st) st xs
 
-apply :: MonadPlus m => Eq i => a -> Statem m i a -> Statem m i a
+apply :: (Predicate t a, MonadPlus m, Eq i) => a -> Statem m i t a -> Statem m i t a
 apply x st = do
   st { current = new_state x st }
 

@@ -1,18 +1,17 @@
 {-# LANGUAGE FlexibleContexts, FlexibleInstances, MultiParamTypeClasses #-}
 
-module Statem (show,
-               State,
-               Statem (current,transitions),
-               cur_transitions,
-               DFA,
-               NFA,
-               info,
-               state,
-               empty,
-               connect,
-               chainFrom,
-               apply,
-               applyAll) where
+module Core (show,
+             State,
+             Statem (transitions,current),
+             connect,
+             info,
+             state,
+             out_transitions,
+             allStates,
+             empty,
+             chainFrom,
+             apply,
+             applyAll) where
 
 import Control.Monad
 import Data.List
@@ -21,9 +20,6 @@ newtype Tst a = Tst (a->Bool)
 
 newtype Transition i t a = Transition (State i, t, State i)
 
-type DFA i t a = Statem Maybe i t a
-type NFA i t a = Statem [] i t a
-
 -- A predicate implements check, which takes a value and returns a function from the alphabet to Bool
 class Predicate b a where
   check :: b -> a -> Bool
@@ -31,7 +27,7 @@ class Predicate b a where
 instance Predicate (Tst a) a where
   check (Tst tst) = tst
 
-instance (Ord a) => Predicate a a where
+instance (Eq a) => Predicate a a where
   check = (==)
 
 data State i = State i deriving (Show,Eq)
@@ -57,17 +53,18 @@ chainFrom start tss =
       tss
   in ret
 
-connect :: State i -> t -> State i -> Statem m i t a  -> Statem m i t a
+connect :: State i -> t -> State i -> Statem m i t a -> Statem m i t a
 connect s t s' sm = sm { transitions = (Transition (s, t, s')) : (transitions sm) }
 
-cur_transitions :: (MonadPlus m, Eq i) => Statem m i t a -> m (Transition i t a)
-cur_transitions (Statem {current = cur, transitions = ts}) = do
-  c <- cur
-  msum $ map return $ filter (\(Transition (s,_,_))-> s==c) ts
+out_transitions :: (Eq i) => State i -> Statem m i t a -> [Transition i t a]
+out_transitions s statem = filter (\(Transition (s',_,_))-> s==s') (transitions statem)
+
+allStates statem = foldl' (\states (Transition (s,_,s')) -> s:s':states) [] (transitions statem)
 
 new_state :: (Predicate t a, MonadPlus m, Eq i) => a -> Statem m i t a -> m (State i)
-new_state x st = do
-  (Transition (_,t,s)) <- cur_transitions st
+new_state x statem = do
+  st' <- current statem
+  (Transition (_,t,s)) <- msum $ map return $ out_transitions st' statem
   guard (check t $ x)
   return s
 
@@ -77,6 +74,13 @@ applyAll xs st = foldl' (\st x -> apply x st) st xs
 apply :: (Predicate t a, MonadPlus m, Eq i) => a -> Statem m i t a -> Statem m i t a
 apply x st = do
   st { current = new_state x st }
+
+-- CONVERSION
+
+isAmbiguous :: (Eq t, Eq i) => Transition i t a -> Statem m i t a -> Bool
+isAmbiguous (Transition (sa, t, sb)) nfa =
+  let targets = filter (\(Transition (sa',t',sb')) -> sa == sa' && t == t' && sb /= sb') (transitions nfa)
+  in (length targets) > 1
 
 -- PRETTY PRINTING
 

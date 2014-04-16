@@ -34,13 +34,6 @@ instance Predicate (Tst a) a where
 instance (Ord a) => Predicate a a where
   check = (==)
 
-instance Show (Tst a) where
-  show _ = "?"
-
-instance (Show i, Show t) => Show (Transition i t a) where
-  show (Transition (s, tst, s')) =
-    (show s) ++ " -" ++ show tst ++ "-> " ++ (show s')
-
 data State i = State i deriving (Show,Eq)
 
 info :: State i -> i
@@ -48,9 +41,6 @@ info (State i) = i
 
 data Statem m i t a = Statem { transitions :: [Transition i t a],
                                current :: m (State i)}
-
-instance (Show i, Show t, Show (m (State i))) => Show (Statem m i t a) where
-  show st = "Statem { " ++ (show (transitions st)) ++ ", " ++ show (current st) ++ " }"
 
 state i = State i
 
@@ -88,3 +78,14 @@ apply :: (Predicate t a, MonadPlus m, Eq i) => a -> Statem m i t a -> Statem m i
 apply x st = do
   st { current = new_state x st }
 
+-- PRETTY PRINTING
+
+instance Show (Tst a) where
+  show _ = "?"
+
+instance (Show i, Show t) => Show (Transition i t a) where
+  show (Transition (s, tst, s')) =
+    (show s) ++ " -" ++ show tst ++ "-> " ++ (show s')
+
+instance (Show i, Show t, Show (m (State i))) => Show (Statem m i t a) where
+  show st = "Statem { " ++ (show (transitions st)) ++ ", " ++ show (current st) ++ " }"

@@ -5,14 +5,12 @@ module Tracked (asDFA,
                 nfa_connect,
                 C.state,
                 C.applyAll,
-                C.chainFrom
                ) where
 
 import qualified Core as C
 
 type DFA i t a = C.Statem Maybe i t a
 type NFA i t a = C.Statem [] i t a
-
 
 nfa_connect :: C.State i -> t -> C.State i -> NFA i t a -> NFA i t a
 nfa_connect = C.connect

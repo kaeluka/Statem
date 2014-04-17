@@ -9,7 +9,6 @@ module Core (show,
              out_transitions,
              allStates,
              empty,
-             chainFrom,
              apply,
              applyAll) where
 
@@ -42,16 +41,6 @@ state i = State i
 
 empty :: MonadPlus m => m (State i) -> Statem m i t a
 empty start = Statem { transitions = [], current = start }
-
-chainFrom :: MonadPlus m => State i -> [(t, State i)] -> Statem m i t a
-chainFrom start tss = 
-  let
-    (ret, _) =
-      foldl' (\ (acc, lastState) (trans, newState) ->
-               (connect lastState trans newState acc, newState))
-      (empty $ return start, start)
-      tss
-  in ret
 
 connect :: State i -> t -> State i -> Statem m i t a -> Statem m i t a
 connect s t s' sm = sm { transitions = (Transition (s, t, s')) : (transitions sm) }
